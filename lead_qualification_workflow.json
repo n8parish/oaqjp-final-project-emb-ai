@@ -1,0 +1,281 @@
+{
+  "name": "Lead Qualification",
+  "nodes": [
+    {
+      "parameters": {
+        "application": "={{$node[\"Airtable Trigger\"].context.base}}",
+        "table": "Leads",
+        "view": "New"
+      },
+      "name": "Airtable Trigger",
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "chat",
+        "openaiCredentials": {
+          "authentication": "apiKey"
+        },
+        "model": "gpt-4",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are an assistant that qualifies employment law leads based on provided criteria. Only respond with one of these tags: QUALIFIED, DECLINED, NEED INFO."
+          },
+          {
+            "role": "user",
+            "content": "={{JSON.stringify($json)}}"
+          }
+        ]
+      },
+      "name": "GPT-4 Qualifier",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": [
+          {
+            "value1": "={{$json[\"choices\"][0].message.content}}",
+            "operation": "equals",
+            "value2": "QUALIFIED"
+          }
+        ],
+        "combineOperation": "any"
+      },
+      "name": "If Qualified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": [
+          {
+            "value1": "={{$json[\"choices\"][0].message.content}}",
+            "operation": "equals",
+            "value2": "NEED INFO"
+          }
+        ],
+        "combineOperation": "any"
+      },
+      "name": "If Need Info?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        650,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "application": "={{$node[\"Airtable Trigger\"].context.base}}",
+        "table": "Leads",
+        "id": "={{$node[\"Airtable Trigger\"].json.id}}",
+        "fields": {
+          "Status": "Qualified"
+        }
+      },
+      "name": "Mark Qualified",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [
+        850,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "application": "={{$node[\"Airtable Trigger\"].context.base}}",
+        "table": "Leads",
+        "id": "={{$node[\"Airtable Trigger\"].json.id}}",
+        "fields": {
+          "Status": "Declined"
+        }
+      },
+      "name": "Mark Declined",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "application": "={{$node[\"Airtable Trigger\"].context.base}}",
+        "table": "Leads",
+        "id": "={{$node[\"Airtable Trigger\"].json.id}}",
+        "fields": {
+          "Status": "Need Info"
+        }
+      },
+      "name": "Mark Need Info",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [
+        850,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "firm@example.com",
+        "toEmail": "attorney@example.com",
+        "subject": "New Qualified Lead",
+        "text": "={{JSON.stringify($node[\"Airtable Trigger\"].json)}}"
+      },
+      "name": "Notify Attorney",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "firm@example.com",
+        "toEmail": "={{$node[\"Airtable Trigger\"].json.email}}",
+        "subject": "Thank you for reaching out",
+        "text": "Sorry, but we are unable to assist with your matter."
+      },
+      "name": "Send Decline Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "firm@example.com",
+        "toEmail": "={{$node[\"Airtable Trigger\"].json.email}}",
+        "subject": "More information needed",
+        "text": "Please provide additional information so we can evaluate your case."
+      },
+      "name": "Send Need Info Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "Airtable Trigger": {
+      "main": [
+        [
+          {
+            "node": "GPT-4 Qualifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4 Qualifier": {
+      "main": [
+        [
+          {
+            "node": "If Qualified?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If Need Info?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Qualified?": {
+      "main": [
+        [
+          {
+            "node": "Mark Qualified",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Declined",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Need Info?": {
+      "main": [
+        [
+          {
+            "node": "Mark Need Info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Declined",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Mark Qualified": {
+      "main": [
+        [
+          {
+            "node": "Notify Attorney",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Declined": {
+      "main": [
+        [
+          {
+            "node": "Send Decline Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Need Info": {
+      "main": [
+        [
+          {
+            "node": "Send Need Info Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
+
